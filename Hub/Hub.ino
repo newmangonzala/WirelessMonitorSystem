@@ -58,30 +58,33 @@ void setup()
   // The default transmitter power is 13dBm, using PA_BOOST.
   // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
   // you can set transmitter powers from 5 to 23 dBm:
-  driver.setTxPower(23, false);
+  driver.setTxPower(5, false);
   
   // You can optionally require this module to wait until Channel Activity
   // Detection shows no activity on the channel before transmitting by setting
   // the CAD timeout to non-zero:
 //  driver.setCADTimeout(10000);
 
+  driver.setModemConfig(2);  /// Bw31_25Cr48Sf512 < Bw = 31.25 kHz, Cr = 4/8, Sf = 512chips/symbol, CRC on. Slow+long range
+
 }
 
+char radiopacket[RH_RF95_MAX_MESSAGE_LEN] =   "";   //packet that will be transmitted
 
-char data[RH_RF95_MAX_MESSAGE_LEN] = "3000";
+char data[RH_RF95_MAX_MESSAGE_LEN] = "1000";
 // Dont put this on the stack:
 uint8_t buf[RH_RF95_MAX_MESSAGE_LEN];
 
 void loop()
 {
 
-  
+  String bufferOut = "";
   delay(1000); // Wait 1 second between transmits, could also 'sleep' here!
   Serial.println("Hearing for any well transmitting..."); // Send a message to rf95_server
   
   if (manager.available())
   {
-    // Wait for a message addressed to us from the client
+    
     uint8_t len = sizeof(buf);
     uint8_t from;
     if (manager.recvfromAck(buf, &len, &from))
@@ -94,9 +97,14 @@ void loop()
       Serial.print("RSSI: ");
       Serial.println(driver.lastRssi(), DEC);
 
+      bufferOut += "1000 ";
+      bufferOut += driver.lastRssi();
+
+      bufferOut.toCharArray(radiopacket, RH_RF95_MAX_MESSAGE_LEN);
+
       // Send a reply back to the originator client
-      if (!manager.sendtoWait(data, sizeof(data), from))
-        Serial.println("sendtoWait failed");
+      if (!manager.sendtoWait(radiopacket, sizeof(radiopacket), from))
+        Serial.println("send reply failed");
       digitalWrite(LED, LOW);
     }
   }

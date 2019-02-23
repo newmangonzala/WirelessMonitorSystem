@@ -14,6 +14,9 @@
 //Frequency
 #define RF95_FREQ 915.0
 
+//Battery pin
+#define VBATPIN A9
+   
 int analogPin = A0;     // potentiometer wiper (middle terminal)
 
 // Singleton instance of the radio driver
@@ -30,10 +33,10 @@ void setup()
   digitalWrite(RFM95_RST, HIGH);
 
   Serial.begin(115200);
-  while (!Serial) {
-    delay(1);
-    Serial.println("Serial not connected");
-  }
+  //while (!Serial) {
+  //  delay(1);
+  //  Serial.println("Serial not connected");
+  //}
   delay(100);
 
   Serial.println("Feather LoRa TX Test!");
@@ -58,12 +61,16 @@ void setup()
   // The default transmitter power is 13dBm, using PA_BOOST.
   // If you are using RFM95/96/97/98 modules which uses the PA_BOOST transmitter pin, then 
   // you can set transmitter powers from 5 to 23 dBm:
-  driver.setTxPower(23, false);
+  driver.setTxPower(5, false);
 
   // You can optionally require this module to wait until Channel Activity
   // Detection shows no activity on the channel before transmitting by setting
   // the CAD timeout to non-zero:
 //  driver.setCADTimeout(10000);
+
+  driver.setModemConfig(2);  /// Bw31_25Cr48Sf512 < Bw = 31.25 kHz, Cr = 4/8, Sf = 512chips/symbol, CRC on. Slow+long range
+
+ 
 }
 
 char radiopacket[20] =   "";   //packet that will be transmitted
@@ -72,9 +79,23 @@ uint32_t syncTime;            //This is the synchronization time from hub
 // Dont put this on the stack:
 char buf[RH_RF95_MAX_MESSAGE_LEN];
 
+int syncT = 0;
+float measuredvbat = 0;
+
 void loop()
 {
-  int syncT = 0;
+
+  //Battery measurement
+  measuredvbat = analogRead(VBATPIN);
+  measuredvbat *= 2;    // we divided by 2, so multiply back
+  measuredvbat *= 3.3;  // Multiply by 3.3V, our reference voltage
+  measuredvbat /= 1024; // convert to voltage
+  if(measuredvbat <= 3.7){
+    Serial.print("PLEASE CHARGE BATTERY NOW! Voltage below 3.7! VBat: " );
+  }
+  Serial.print("VBat: " ); Serial.println(measuredvbat);
+
+  
   Serial.println("Sleeping..");
   delay(syncT); // Wait 1 second between transmits, could also 'sleep' here!
   Serial.println("Sending to Hub");
@@ -83,7 +104,6 @@ void loop()
   int val = 0;                   // variable to store the value read
   float vout = 0;                // voltage out
   String bufferOut = "";         //string to append all values
-  float bLife = 0;               //battery life
   
   
   val = analogRead(analogPin);          // read the input pin
@@ -92,7 +112,7 @@ void loop()
 
   bufferOut += vout;                  
   bufferOut += " ";
-  bufferOut += bLife;
+  bufferOut += measuredvbat;
 
   bufferOut.toCharArray(radiopacket, 20);
     
